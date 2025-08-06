@@ -1,3 +1,6 @@
+# 1.0.5
+* Tombstones are now always available to interact (in case you died in locked biome)
+
 # 1.0.4
 * patch 0.220.3
 * ServerSync updated

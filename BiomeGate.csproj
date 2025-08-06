@@ -73,9 +73,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Libs\ServerSync.dll" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="ILRepack.targets" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

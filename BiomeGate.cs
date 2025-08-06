@@ -15,7 +15,7 @@ namespace BiomeGate
     {
         public const string pluginID = "shudnal.BiomeGate";
         public const string pluginName = "Biome Gate";
-        public const string pluginVersion = "1.0.4";
+        public const string pluginVersion = "1.0.5";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
@@ -189,6 +189,7 @@ namespace BiomeGate
                     .Where(p => p.Name != "ShipControlls")
                     .Where(p => p.Name != "Sadle")
                     .Where(p => p.Name != "Chair")
+                    .Where(p => p.Name != "TombStone")
                     .SelectMany(t => new List<MethodBase>() { AccessTools.Method(t, "Interact"), AccessTools.Method(t, "UseItem") });
             }
 
