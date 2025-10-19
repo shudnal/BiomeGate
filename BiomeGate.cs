@@ -15,7 +15,7 @@ namespace BiomeGate
     {
         public const string pluginID = "shudnal.BiomeGate";
         public const string pluginName = "Biome Gate";
-        public const string pluginVersion = "1.0.5";
+        public const string pluginVersion = "1.0.6";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
@@ -45,7 +45,15 @@ namespace BiomeGate
         public static ConfigEntry<bool> globalKeyPermitted;
         public static ConfigEntry<string> globalKeyAvailability;
 
+        public static ConfigEntry<bool> playerKeyPermitted;
+        public static ConfigEntry<string> playerKeyAvailability;
+
+        public static ConfigEntry<bool> playerItemPermitted;
+        public static ConfigEntry<string> playerItemAvailability;
+
         private static readonly Dictionary<string, string> biomeGlobalKeys = new Dictionary<string, string>();
+        private static readonly Dictionary<string, string> biomePlayerKeys = new Dictionary<string, string>();
+        private static readonly Dictionary<string, string> biomePlayerItems = new Dictionary<string, string>();
 
         private void Awake()
         {
@@ -103,12 +111,26 @@ namespace BiomeGate
             showStartMessage.SettingChanged += (sender, args) => SE_BiomeGate.UpdateBiomeGateProperties();
             showStatusEffectIcon.SettingChanged += (sender, args) => SE_BiomeGate.UpdateBiomeGateProperties();
 
-            globalKeyPermitted = config("Gating - Global keys", "Disable gating if global key is set", defaultValue: false, "Admins and host will not be affected");
+            globalKeyPermitted = config("Gating - Global keys", "Disable gating if global key is set", defaultValue: false, "If enabled - corresponding global key should be set to disable biome gating");
             globalKeyAvailability = config("Gating - Global keys", "Biome global keys", defaultValue: "Swamp:defeated_gdking,Mountain:defeated_bonemass,Plains:defeated_dragon,Mistlands:defeated_goblinking,AshLands:defeated_queen,DeepNorth:defeated_fader", "Comma-separated list of biome-globalkey pairs. If globalkey is set biome will not be gated.");
 
             globalKeyAvailability.SettingChanged += (sender, args) => UpdateGlobalKeysList();
 
             UpdateGlobalKeysList();
+
+            playerKeyPermitted = config("Gating - Player keys", "Disable gating if player key is set", defaultValue: false, "If enabled - corresponding player key should be set to disable biome gating");
+            playerKeyAvailability = config("Gating - Player keys", "Biome player keys", defaultValue: "Swamp:GP_TheElder,Mountain:GP_Bonemass,Plains:GP_Moder,Mistlands:GP_Yagluth,AshLands:GP_Queen,DeepNorth:GP_Fader", "Comma-separated list of biome-playerkey pairs. If playerkey is set biome will not be gated.");
+
+            playerKeyAvailability.SettingChanged += (sender, args) => UpdatePlayerKeysList();
+
+            UpdatePlayerKeysList();
+
+            playerItemPermitted = config("Gating - Player items", "Disable gating if player has item known", defaultValue: false, "If enabled - corresponding item should be known by player to disable biome gating");
+            playerItemAvailability = config("Gating - Player items", "Biome player items", defaultValue: "Swamp:$item_cryptkey,Mountain:$item_wishbone,Plains:$item_dragontear,Mistlands:$item_yagluththing,AshLands:$item_seekerqueen_drop,DeepNorth:$item_fader_drop", "Comma-separated list of biome-item pairs. If item is known by player biome will not be gated.");
+            
+            playerItemAvailability.SettingChanged += (sender, args) => UpdatePlayerItemsList();
+
+            UpdatePlayerItemsList();
         }
 
         private static void UpdateGlobalKeysList()
@@ -125,13 +147,41 @@ namespace BiomeGate
             };
         }
 
+        private static void UpdatePlayerKeysList()
+        {
+            biomePlayerKeys.Clear();
+
+            foreach (string biomeKey in playerKeyAvailability.Value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] pair = biomeKey.Split(new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                if (pair.Length != 2)
+                    continue;
+
+                biomePlayerKeys[pair[0].Trim()] = pair[1].Trim();
+            };
+        }
+
+        private static void UpdatePlayerItemsList()
+        {
+            biomePlayerItems.Clear();
+
+            foreach (string biomeKey in playerItemAvailability.Value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] pair = biomeKey.Split(new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                if (pair.Length != 2)
+                    continue;
+
+                biomePlayerItems[pair[0].Trim()] = pair[1].Trim();
+            };
+        }
+
         private static bool IsAdmin()
         {
             if (!adminPermitted.Value)
                 return false;
 
             if (!ZNet.instance)
-                return false;
+                return true;
 
             return ZNet.instance.LocalPlayerIsAdminOrHost();
         }
@@ -150,32 +200,52 @@ namespace BiomeGate
 
         public void FixedUpdate()
         {
-            if (Player.m_localPlayer == null)
-                return;
-
-            if (Player.m_localPlayer.GetSEMan().HaveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash))
+            if (Player.m_localPlayer is Player player && player.GetSEMan() is SEMan seman && player.IsOwner())
             {
-                if (!modEnabled.Value)
-                    Player.m_localPlayer.GetSEMan().RemoveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
-                else if (gatedBiomes.Value == Heightmap.Biome.None || Player.m_localPlayer.m_currentBiome == Heightmap.Biome.None)
-                    Player.m_localPlayer.GetSEMan().RemoveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
-                else if (!gatedBiomes.Value.HasFlag(Player.m_localPlayer.m_currentBiome))
-                    Player.m_localPlayer.GetSEMan().RemoveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
-                else if (IsAdmin())
-                    Player.m_localPlayer.GetSEMan().RemoveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
-                else if (IsBiomeGlobalKeyEnabled())
-                    Player.m_localPlayer.GetSEMan().RemoveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
-            }
-            else if (modEnabled.Value)
-            {
-                if (gatedBiomes.Value.HasFlag(Player.m_localPlayer.m_currentBiome) && !Player.m_localPlayer.InCutscene() && !Player.m_localPlayer.IsTeleporting() && !IsAdmin() && !IsBiomeGlobalKeyEnabled())
-                    Player.m_localPlayer.GetSEMan().AddStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
+                if (seman.HaveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash))
+                {
+                    if (RemoveStatusEffect(player))
+                        seman.RemoveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
+                }
+                else if (modEnabled.Value)
+                {
+                    if (AddStatusEffect(player))
+                        seman.AddStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash);
+                }
             }
         }
 
-        private static bool IsBiomeGlobalKeyEnabled() => globalKeyPermitted.Value && biomeGlobalKeys.TryGetValue(Player.m_localPlayer.m_currentBiome.ToString(), out string globalKey) && ZoneSystem.instance && ZoneSystem.instance.GetGlobalKey(globalKey);
+        public static bool RemoveStatusEffect(Player player)
+        {
+            return !modEnabled.Value ||
+                   gatedBiomes.Value == Heightmap.Biome.None || player.m_currentBiome == Heightmap.Biome.None ||
+                   !gatedBiomes.Value.HasFlag(player.m_currentBiome) ||
+                   IsAdmin() ||
+                   IsGatingDisabledByProgression(player);
+        }
 
-        private static bool IsGated(Humanoid human) => human is Player player && player.GetSEMan().HaveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash) && Ship.GetLocalShip() == null;
+        public static bool AddStatusEffect(Player player)
+        {
+            return gatedBiomes.Value != Heightmap.Biome.None && 
+                   player.m_currentBiome != Heightmap.Biome.None && 
+                   gatedBiomes.Value.HasFlag(player.m_currentBiome) &&
+                   !player.InCutscene() &&
+                   !player.IsTeleporting() &&
+                   !player.m_isLoading &&
+                   !player.IsDead() && 
+                   !IsAdmin() &&
+                   !IsGatingDisabledByProgression(player);
+        }
+
+        public static bool IsGatingDisabledByProgression(Player player) => IsBiomeGlobalKeyEnabled(player) || IsBiomePlayerKeyEnabled(player) || IsBiomePlayerItemEnabled(player);
+
+        private static bool IsBiomeGlobalKeyEnabled(Player player) => globalKeyPermitted.Value && biomeGlobalKeys.TryGetValue(player.m_currentBiome.ToString(), out string globalKey) && ZoneSystem.instance?.GetGlobalKey(globalKey) == true;
+        
+        private static bool IsBiomePlayerKeyEnabled(Player player) => playerKeyPermitted.Value && biomePlayerKeys.TryGetValue(player.m_currentBiome.ToString(), out string playerKey) && player.HaveUniqueKey(playerKey);
+
+        private static bool IsBiomePlayerItemEnabled(Player player) => playerItemPermitted.Value && biomePlayerItems.TryGetValue(player.m_currentBiome.ToString(), out string playerItem) && player.IsKnownMaterial(playerItem);
+
+        private static bool IsGated(Humanoid human) => human is Player player && player.GetSEMan()?.HaveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash) == true && Ship.GetLocalShip() == null;
 
         [HarmonyPatch]
         public static class PreventInteractions

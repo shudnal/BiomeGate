@@ -1,3 +1,8 @@
+# 1.0.6
+* player keys can be used to disable gating
+* items known by player can be used to disable gating
+* fixed "I wouldn't do it..." message on every startup if any biome is gated
+
 # 1.0.5
 * Tombstones are now always available to interact (in case you died in locked biome)
 
