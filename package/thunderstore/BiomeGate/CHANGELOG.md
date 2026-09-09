@@ -1,3 +1,8 @@
+# 1.0.7
+* Updated for the Valheim 1.0.7 release.
+* Completed the migration to the standalone ConditionalConfigSync dependency.
+* Updated required dependencies to BepInExPack Valheim 5.4.2350 and ConditionalConfigSync 1.0.5.
+
 # 1.0.6
 * player keys can be used to disable gating
 * items known by player can be used to disable gating

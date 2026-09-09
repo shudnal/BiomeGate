@@ -1,7 +1,7 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
-using ServerSync;
+using ConditionalConfigSync;
 using System.Collections.Generic;
 using System.Reflection;
 using System;
@@ -11,11 +11,12 @@ using static HitData;
 namespace BiomeGate
 {
     [BepInPlugin(pluginID, pluginName, pluginVersion)]
+    [BepInDependency("_shudnal.ConditionalConfigSync", "1.0.5")]
     public class BiomeGate : BaseUnityPlugin
     {
         public const string pluginID = "shudnal.BiomeGate";
         public const string pluginName = "Biome Gate";
-        public const string pluginVersion = "1.0.6";
+        public const string pluginVersion = "1.0.7";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
@@ -81,7 +82,6 @@ namespace BiomeGate
 
         private void ConfigInit()
         {
-            config("General", "NexusID", 2877, "Nexus mod ID for updates", false);
 
             modEnabled = config("General", "Enabled", defaultValue: true, "Enable the mod.");
             configLocked = config("General", "Lock Configuration", defaultValue: true, "Configuration is locked and can be changed by server admins only.");
@@ -190,8 +190,7 @@ namespace BiomeGate
         {
             ConfigEntry<T> configEntry = Config.Bind(group, name, defaultValue, description);
 
-            SyncedConfigEntry<T> syncedConfigEntry = configSync.AddConfigEntry(configEntry);
-            syncedConfigEntry.SynchronizedConfig = synchronizedSetting;
+            configSync.AddConfigEntry(configEntry, ConfigSyncMode.Conditional, serverControlledByDefault: synchronizedSetting);
 
             return configEntry;
         }
