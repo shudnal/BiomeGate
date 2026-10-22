@@ -20,6 +20,36 @@ namespace BiomeGate
             return Localization.instance.Localize(statusEffectTooltip);
         }
 
+        public override void ModifyAttack(Skills.SkillType skill, ref HitData hitData)
+        {
+            if ((damageModifierIgnoredSkills.Value & GetDamageSkillFlag(skill)) != DamageSkillFlags.None)
+                return;
+
+            base.ModifyAttack(skill, ref hitData);
+        }
+
+        private static DamageSkillFlags GetDamageSkillFlag(Skills.SkillType skill)
+        {
+            switch (skill)
+            {
+                case Skills.SkillType.Swords: return DamageSkillFlags.Swords;
+                case Skills.SkillType.Knives: return DamageSkillFlags.Knives;
+                case Skills.SkillType.Clubs: return DamageSkillFlags.Clubs;
+                case Skills.SkillType.Polearms: return DamageSkillFlags.Polearms;
+                case Skills.SkillType.Spears: return DamageSkillFlags.Spears;
+                case Skills.SkillType.Blocking: return DamageSkillFlags.Blocking;
+                case Skills.SkillType.Axes: return DamageSkillFlags.Axes;
+                case Skills.SkillType.Bows: return DamageSkillFlags.Bows;
+                case Skills.SkillType.ElementalMagic: return DamageSkillFlags.ElementalMagic;
+                case Skills.SkillType.BloodMagic: return DamageSkillFlags.BloodMagic;
+                case Skills.SkillType.Unarmed: return DamageSkillFlags.Unarmed;
+                case Skills.SkillType.Pickaxes: return DamageSkillFlags.Pickaxes;
+                case Skills.SkillType.WoodCutting: return DamageSkillFlags.WoodCutting;
+                case Skills.SkillType.Crossbows: return DamageSkillFlags.Crossbows;
+                default: return DamageSkillFlags.None;
+            }
+        }
+
         public static void UpdateBiomeGateProperties()
         {
             if (ObjectDB.instance)

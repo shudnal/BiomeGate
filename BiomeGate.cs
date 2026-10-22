@@ -10,6 +10,26 @@ using static HitData;
 
 namespace BiomeGate
 {
+    [Flags]
+    public enum DamageSkillFlags
+    {
+        None = 0,
+        Swords = 1 << 0,
+        Knives = 1 << 1,
+        Clubs = 1 << 2,
+        Polearms = 1 << 3,
+        Spears = 1 << 4,
+        Blocking = 1 << 5,
+        Axes = 1 << 6,
+        Bows = 1 << 7,
+        ElementalMagic = 1 << 8,
+        BloodMagic = 1 << 9,
+        Unarmed = 1 << 10,
+        Pickaxes = 1 << 11,
+        WoodCutting = 1 << 12,
+        Crossbows = 1 << 13
+    }
+
     [BepInPlugin(pluginID, pluginName, pluginVersion)]
     [BepInDependency("_shudnal.ConditionalConfigSync", "1.0.5")]
     public class BiomeGate : BaseUnityPlugin
@@ -33,6 +53,7 @@ namespace BiomeGate
 
         public static ConfigEntry<DamageModifier> damageReceivedModifier;
         public static ConfigEntry<float> damageDoneModifier;
+        public static ConfigEntry<DamageSkillFlags> damageModifierIgnoredSkills;
         public static ConfigEntry<float> noiseModifier;
         public static ConfigEntry<float> sneakModifier;
         public static ConfigEntry<float> raiseSkillModifier;
@@ -95,6 +116,7 @@ namespace BiomeGate
             
             damageReceivedModifier = config("Gating", "Damage received modifier", defaultValue: DamageModifier.VeryWeak, "Damage modifier for incoming damage");
             damageDoneModifier = config("Gating", "Damage dealt modifier", defaultValue: 0f, "Damage modifier for damage done by affected players");
+            damageModifierIgnoredSkills = config("Gating", "Damage modifier ignored skills", defaultValue: DamageSkillFlags.None, "Do not apply Damage dealt modifier to attacks that use the selected skills. This applies to all targets, including creatures. Leave all skills unchecked to apply the modifier to every skill. Skill gain is not changed by this setting.");
             noiseModifier = config("Gating", "Noise modifier", defaultValue: 10f, "Noise modifier. How far away player will be heared.");
             sneakModifier = config("Gating", "Sneak modifier", defaultValue: -1f, "Sneak efficacy modifier");
             raiseSkillModifier = config("Gating", "Raise skill modifier", defaultValue: -100f, "Modifier for skill raise. 0 is normal skill raise. Other status effects can also modify skill raise.");

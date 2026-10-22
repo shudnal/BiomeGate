@@ -38,6 +38,21 @@ The best way to handle configs is [Configuration Manager](https://thunderstore.i
 
 Or [Official BepInEx Configuration Manager](https://valheim.thunderstore.io/package/Azumatt/Official_BepInEx_ConfigurationManager/).
 
+### Damage modifier exceptions
+
+Use **Gating > Damage modifier ignored skills** to select skills that ignore **Damage dealt modifier**. Configuration Manager shows a checkbox for each skill. By default, no skills are selected and the damage modifier applies as before. Changes apply to the next attack.
+
+For mining and wood cutting, select **Pickaxes** and **WoodCutting**. In the config file, use:
+
+```ini
+[Gating]
+Damage modifier ignored skills = Pickaxes, WoodCutting
+```
+
+Exceptions use the skill of each hit. They apply to all targets, including creatures. A pickaxe attack against a creature also ignores the modifier when **Pickaxes** is selected. An axe hit uses **WoodCutting** only when the attack selects that skill for the target. Hits that still use **Axes**, such as hits on some destructible objects, keep the modifier unless **Axes** is also selected.
+
+This setting does not change skill gain or other BiomeGate restrictions. Skills that are not listed in this setting keep the damage modifier.
+
 ## Dependencies
 
 - [BepInExPack Valheim 5.4.2350](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/)
