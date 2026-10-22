@@ -53,6 +53,27 @@ Exceptions use the skill of each hit. They apply to all targets, including creat
 
 This setting does not change skill gain or other BiomeGate restrictions. Skills that are not listed in this setting keep the damage modifier.
 
+### Creature damage received
+
+Use **Gating > Creature damage received multiplier** to change damage received by creatures in gated biomes. The default value is **1**, which disables this check. The setting applies to all non-player creatures, including bosses and tamed animals, regardless of the damage source.
+
+The check uses the creature's current biome and the existing global key rules. If **Disable gating if global key is set** is enabled and the biome's global key is set, the multiplier does not apply. Player keys, known items, and admin exceptions do not affect this setting.
+
+For example:
+
+```ini
+[Gating]
+Damage dealt modifier = 0.5
+Damage modifier ignored skills = Pickaxes, WoodCutting
+Creature damage received multiplier = 0.5
+```
+
+When both restrictions are active, ordinary weapon hits against creatures receive both damage modifiers. Hits against objects receive only the player's modifier. Hits that use **Pickaxes** or **WoodCutting** skip the player's modifier, so mining and wood cutting keep their damage. A pickaxe hit against a creature still receives the creature multiplier.
+
+The multiplier applies to damage types after blocking, armor, and resistances. It also applies to each tick of fire, spirit, and poison damage, using the creature's position and global keys at that time. Damage numbers are reduced with the damage types. Direct health costs and extra flat damage added by world-level rules are not changed.
+
+Use a finite value of **0** or more. Negative values and non-finite values are ignored. Changes apply to the next hit or damage tick. Install the mod on all clients and the server so the same setting applies when ownership of a creature changes.
+
 ## Dependencies
 
 - [BepInExPack Valheim 5.4.2350](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/)
