@@ -1,3 +1,9 @@
+# 1.0.8
+
+* Added skill checkboxes to exclude selected attacks from the outgoing damage modifier, including mining and wood cutting.
+* Added a creature damage multiplier for gated biomes. It follows global key rules without changing the displayed damage numbers.
+* Fixed admin detection for the "Ignore admins" setting.
+
 # 1.0.7
 * Updated for the Valheim 1.0.7 release.
 * Completed the migration to the standalone ConditionalConfigSync dependency.

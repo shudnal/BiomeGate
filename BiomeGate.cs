@@ -4,6 +4,7 @@ using HarmonyLib;
 using ConditionalConfigSync;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using System;
 using System.Linq;
 using static HitData;
@@ -36,7 +37,7 @@ namespace BiomeGate
     {
         public const string pluginID = "shudnal.BiomeGate";
         public const string pluginName = "Biome Gate";
-        public const string pluginVersion = "1.0.7";
+        public const string pluginVersion = "1.0.8";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
@@ -80,9 +81,9 @@ namespace BiomeGate
 
         private void Awake()
         {
-            harmony.PatchAll();
-
             instance = this;
+
+            harmony.PatchAll();
 
             ConfigInit();
             _ = configSync.AddLockingConfigEntry(configLocked);
@@ -118,7 +119,7 @@ namespace BiomeGate
             damageReceivedModifier = config("Gating", "Damage received modifier", defaultValue: DamageModifier.VeryWeak, "Damage modifier for incoming damage");
             damageDoneModifier = config("Gating", "Damage dealt modifier", defaultValue: 0f, "Damage modifier for damage done by affected players");
             damageModifierIgnoredSkills = config("Gating", "Damage modifier ignored skills", defaultValue: DamageSkillFlags.None, "Do not apply Damage dealt modifier to attacks that use the selected skills. This applies to all targets, including creatures. Leave all skills unchecked to apply the modifier to every skill. Skill gain is not changed by this setting.");
-            creatureDamageReceivedMultiplier = config("Gating", "Creature damage received multiplier", defaultValue: 1f, "Multiply damage types received by non-player creatures in gated biomes. Uses the creature's current biome and global key rules. Applies to all damage sources, including damage over time. Player-specific unlocks and admin exceptions do not apply. Set to 1 to disable. Use a finite value of 0 or more.");
+            creatureDamageReceivedMultiplier = config("Gating", "Creature damage received multiplier", defaultValue: 1f, "Multiply damage types received by non-player creatures in gated biomes without changing displayed damage numbers. Uses the creature's current biome and global key rules. Applies to all damage sources, including damage over time. Player-specific unlocks and admin exceptions do not apply. Set to 1 to disable. Use a finite value of 0 or more.");
             noiseModifier = config("Gating", "Noise modifier", defaultValue: 10f, "Noise modifier. How far away player will be heared.");
             sneakModifier = config("Gating", "Sneak modifier", defaultValue: -1f, "Sneak efficacy modifier");
             raiseSkillModifier = config("Gating", "Raise skill modifier", defaultValue: -100f, "Modifier for skill raise. 0 is normal skill raise. Other status effects can also modify skill raise.");
@@ -207,7 +208,9 @@ namespace BiomeGate
             if (!ZNet.instance)
                 return true;
 
-            return ZNet.instance.LocalPlayerIsAdminOrHost();
+            // Local config ownership does not prove server admin access.
+            return ZNet.instance.IsServer() ||
+                   (configSync.InitialSyncDone && !configSync.IsSourceOfTruth && configSync.IsAdmin);
         }
 
         ConfigEntry<T> config<T>(string group, string name, T defaultValue, ConfigDescription description, bool synchronizedSetting = true)
@@ -275,7 +278,37 @@ namespace BiomeGate
         [HarmonyPatch(typeof(Character), nameof(Character.ApplyDamage))]
         public static class Character_ApplyDamage_CreatureDamageMultiplier
         {
-            private static void Prefix(Character __instance, HitData hit)
+            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                List<CodeInstruction> codes = instructions.ToList();
+                MethodInfo getTotalDamage = AccessTools.Method(typeof(HitData), nameof(HitData.GetTotalDamage), Type.EmptyTypes);
+                int firstDamageCall = getTotalDamage == null ? -1 : codes.FindIndex(instruction => instruction.Calls(getTotalDamage));
+                int storeIndex = firstDamageCall + 1;
+                while (storeIndex < codes.Count && codes[storeIndex].opcode == OpCodes.Nop)
+                    storeIndex++;
+
+                if (firstDamageCall < 0 || codes.Count(instruction => instruction.Calls(getTotalDamage)) != 2 ||
+                    storeIndex + 1 >= codes.Count || !codes[storeIndex].IsStloc() ||
+                    codes[storeIndex].blocks.Count != 0 || codes[storeIndex + 1].blocks.Count != 0)
+                {
+                    instance.Logger.LogError("Could not locate the expected damage calculations in Character.ApplyDamage. The creature damage multiplier was not applied.");
+                    return codes;
+                }
+
+                // Keep the first total for damage text, then scale the hit before the second total and stagger.
+                int insertIndex = storeIndex + 1;
+                CodeInstruction loadCharacter = new CodeInstruction(OpCodes.Ldarg_0).MoveLabelsFrom(codes[insertIndex]);
+                codes.InsertRange(insertIndex, new[]
+                {
+                    loadCharacter,
+                    new CodeInstruction(OpCodes.Ldarg_1),
+                    new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Character_ApplyDamage_CreatureDamageMultiplier), nameof(ApplyCreatureDamageMultiplier)))
+                });
+
+                return codes;
+            }
+
+            private static void ApplyCreatureDamageMultiplier(Character character, HitData hit)
             {
                 float multiplier = creatureDamageReceivedMultiplier.Value;
                 if (multiplier == 1f || !modEnabled.Value)
@@ -284,14 +317,14 @@ namespace BiomeGate
                 if (multiplier < 0f || float.IsNaN(multiplier) || float.IsInfinity(multiplier))
                     return;
 
-                if (__instance.IsPlayer() || !__instance.IsOwner() || gatedBiomes.Value == Heightmap.Biome.None)
+                if (character.IsPlayer() || !character.IsOwner() || gatedBiomes.Value == Heightmap.Biome.None)
                     return;
 
                 WorldGenerator worldGenerator = WorldGenerator.instance;
                 if (worldGenerator == null)
                     return;
 
-                Heightmap.Biome biome = worldGenerator.GetBiomeSector(__instance.transform.position).BiomeType.Biome;
+                Heightmap.Biome biome = worldGenerator.GetBiomeSector(character.transform.position).BiomeType.Biome;
                 if (biome == Heightmap.Biome.None || !gatedBiomes.Value.HasFlag(biome) || IsBiomeGlobalKeyEnabled(biome))
                     return;
 

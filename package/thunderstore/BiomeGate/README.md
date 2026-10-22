@@ -70,9 +70,13 @@ Creature damage received multiplier = 0.5
 
 When both restrictions are active, ordinary weapon hits against creatures receive both damage modifiers. Hits against objects receive only the player's modifier. Hits that use **Pickaxes** or **WoodCutting** skip the player's modifier, so mining and wood cutting keep their damage. A pickaxe hit against a creature still receives the creature multiplier.
 
-The multiplier applies to damage types after blocking, armor, and resistances. It also applies to each tick of fire, spirit, and poison damage, using the creature's position and global keys at that time. Damage numbers are reduced with the damage types. Direct health costs and extra flat damage added by world-level rules are not changed.
+The multiplier applies to damage types after blocking, armor, and resistances. It also applies to each tick of fire, spirit, and poison damage, using the creature's position and global keys at that time. Displayed damage numbers use the damage before this multiplier. Health loss and stagger use the modified damage. **Damage dealt modifier** still affects the displayed numbers. Direct health costs are not changed.
 
 Use a finite value of **0** or more. Negative values and non-finite values are ignored. Changes apply to the next hit or damage tick. Install the mod on all clients and the server so the same setting applies when ownership of a creature changes.
+
+### Admin exceptions
+
+When **Ignore admins** is enabled, the host is exempt from player gating. Connected administrators are exempt after BiomeGate receives its initial configuration sync and the server confirms their admin status. This exemption is unavailable when BiomeGate is installed only on the client. **Ignore admins** does not affect the creature damage multiplier.
 
 ## Dependencies
 
