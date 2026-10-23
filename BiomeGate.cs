@@ -116,7 +116,7 @@ namespace BiomeGate
             preventExploring = config("Gating", "Prevent exploring", defaultValue: true, "Prevent minimap from exploring");
             preventInteraction = config("Gating", "Prevent interactions", defaultValue: true, "Prevent interaction with any interactable object");
             
-            damageReceivedModifier = config("Gating", "Damage received modifier", defaultValue: DamageModifier.VeryWeak, "Damage modifier for incoming damage");
+            damageReceivedModifier = config("Gating", "Damage received modifier", defaultValue: DamageModifier.VeryWeak, "Damage modifier for incoming damage. Normal preserves the player's existing resistances and immunities.");
             damageDoneModifier = config("Gating", "Damage dealt modifier", defaultValue: 0f, "Damage modifier for damage done by affected players");
             damageModifierIgnoredSkills = config("Gating", "Damage modifier ignored skills", defaultValue: DamageSkillFlags.None, "Do not apply Damage dealt modifier to attacks that use the selected skills. This applies to all targets, including creatures. Leave all skills unchecked to apply the modifier to every skill. Skill gain is not changed by this setting.");
             creatureDamageReceivedMultiplier = config("Gating", "Creature damage received multiplier", defaultValue: 1f, "Multiply damage types received by non-player creatures in gated biomes without changing displayed damage numbers. Uses the creature's current biome and global key rules. Applies to all damage sources, including damage over time. Player-specific unlocks and admin exceptions do not apply. Set to 1 to disable. Use a finite value of 0 or more.");

@@ -38,6 +38,10 @@ The best way to handle configs is [Configuration Manager](https://thunderstore.i
 
 Or [Official BepInEx Configuration Manager](https://valheim.thunderstore.io/package/Azumatt/Official_BepInEx_ConfigurationManager/).
 
+### Player damage received
+
+Use **Gating > Damage received modifier** to change incoming damage for affected players. Set it to **Normal** to keep the player's existing resistances and immunities. This setting is separate from **Damage dealt modifier** and **Creature damage received multiplier**.
+
 ### Damage modifier exceptions
 
 Use **Gating > Damage modifier ignored skills** to select skills that ignore **Damage dealt modifier**. Configuration Manager shows a checkbox for each skill. By default, no skills are selected and the damage modifier applies as before. Changes apply to the next attack.

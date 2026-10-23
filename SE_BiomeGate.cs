@@ -77,6 +77,10 @@ namespace BiomeGate
             statusEffect.m_startMessage = showStartMessage.Value ? "$npc_dvergr_ashlands_random_private_area_alarm5" : "";
 
             statusEffect.m_mods.Clear();
+            // Normal must preserve the player's existing resistances and immunities.
+            if (damageReceivedModifier.Value == DamageModifier.Normal)
+                return;
+
             foreach (DamageType damageType in Enum.GetValues(typeof(DamageType)))
                 if (damageType != DamageType.Damage && damageType != DamageType.Physical && damageType != DamageType.Elemental)
                     statusEffect.m_mods.Add(new DamageModPair() { m_modifier = damageReceivedModifier.Value, m_type = damageType });
