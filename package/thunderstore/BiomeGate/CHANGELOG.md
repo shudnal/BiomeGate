@@ -1,9 +1,7 @@
 # 1.0.9
-
 * Fixed "Normal" incoming damage so it preserves player resistances and immunities.
 
 # 1.0.8
-
 * Added skill checkboxes to exclude selected attacks from the outgoing damage modifier, including mining and wood cutting.
 * Added a creature damage multiplier for gated biomes. It follows global key rules without changing the displayed damage numbers.
 * Fixed admin detection for the "Ignore admins" setting.
