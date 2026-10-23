@@ -4,19 +4,40 @@ using HarmonyLib;
 using ConditionalConfigSync;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using System;
 using System.Linq;
 using static HitData;
 
 namespace BiomeGate
 {
+    [Flags]
+    public enum DamageSkillFlags
+    {
+        None = 0,
+        Swords = 1 << 0,
+        Knives = 1 << 1,
+        Clubs = 1 << 2,
+        Polearms = 1 << 3,
+        Spears = 1 << 4,
+        Blocking = 1 << 5,
+        Axes = 1 << 6,
+        Bows = 1 << 7,
+        ElementalMagic = 1 << 8,
+        BloodMagic = 1 << 9,
+        Unarmed = 1 << 10,
+        Pickaxes = 1 << 11,
+        WoodCutting = 1 << 12,
+        Crossbows = 1 << 13
+    }
+
     [BepInPlugin(pluginID, pluginName, pluginVersion)]
     [BepInDependency("_shudnal.ConditionalConfigSync", "1.0.5")]
     public class BiomeGate : BaseUnityPlugin
     {
         public const string pluginID = "shudnal.BiomeGate";
         public const string pluginName = "Biome Gate";
-        public const string pluginVersion = "1.0.7";
+        public const string pluginVersion = "1.0.9";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
@@ -33,6 +54,8 @@ namespace BiomeGate
 
         public static ConfigEntry<DamageModifier> damageReceivedModifier;
         public static ConfigEntry<float> damageDoneModifier;
+        public static ConfigEntry<DamageSkillFlags> damageModifierIgnoredSkills;
+        public static ConfigEntry<float> creatureDamageReceivedMultiplier;
         public static ConfigEntry<float> noiseModifier;
         public static ConfigEntry<float> sneakModifier;
         public static ConfigEntry<float> raiseSkillModifier;
@@ -58,9 +81,9 @@ namespace BiomeGate
 
         private void Awake()
         {
-            harmony.PatchAll();
-
             instance = this;
+
+            harmony.PatchAll();
 
             ConfigInit();
             _ = configSync.AddLockingConfigEntry(configLocked);
@@ -93,8 +116,10 @@ namespace BiomeGate
             preventExploring = config("Gating", "Prevent exploring", defaultValue: true, "Prevent minimap from exploring");
             preventInteraction = config("Gating", "Prevent interactions", defaultValue: true, "Prevent interaction with any interactable object");
             
-            damageReceivedModifier = config("Gating", "Damage received modifier", defaultValue: DamageModifier.VeryWeak, "Damage modifier for incoming damage");
+            damageReceivedModifier = config("Gating", "Damage received modifier", defaultValue: DamageModifier.VeryWeak, "Damage modifier for incoming damage. Normal preserves the player's existing resistances and immunities.");
             damageDoneModifier = config("Gating", "Damage dealt modifier", defaultValue: 0f, "Damage modifier for damage done by affected players");
+            damageModifierIgnoredSkills = config("Gating", "Damage modifier ignored skills", defaultValue: DamageSkillFlags.None, "Do not apply Damage dealt modifier to attacks that use the selected skills. This applies to all targets, including creatures. Leave all skills unchecked to apply the modifier to every skill. Skill gain is not changed by this setting.");
+            creatureDamageReceivedMultiplier = config("Gating", "Creature damage received multiplier", defaultValue: 1f, "Multiply damage types received by non-player creatures in gated biomes without changing displayed damage numbers. Uses the creature's current biome and global key rules. Applies to all damage sources, including damage over time. Player-specific unlocks and admin exceptions do not apply. Set to 1 to disable. Use a finite value of 0 or more.");
             noiseModifier = config("Gating", "Noise modifier", defaultValue: 10f, "Noise modifier. How far away player will be heared.");
             sneakModifier = config("Gating", "Sneak modifier", defaultValue: -1f, "Sneak efficacy modifier");
             raiseSkillModifier = config("Gating", "Raise skill modifier", defaultValue: -100f, "Modifier for skill raise. 0 is normal skill raise. Other status effects can also modify skill raise.");
@@ -183,7 +208,9 @@ namespace BiomeGate
             if (!ZNet.instance)
                 return true;
 
-            return ZNet.instance.LocalPlayerIsAdminOrHost();
+            // Local config ownership does not prove server admin access.
+            return ZNet.instance.IsServer() ||
+                   (configSync.InitialSyncDone && !configSync.IsSourceOfTruth && configSync.IsAdmin);
         }
 
         ConfigEntry<T> config<T>(string group, string name, T defaultValue, ConfigDescription description, bool synchronizedSetting = true)
@@ -238,13 +265,72 @@ namespace BiomeGate
 
         public static bool IsGatingDisabledByProgression(Player player) => IsBiomeGlobalKeyEnabled(player) || IsBiomePlayerKeyEnabled(player) || IsBiomePlayerItemEnabled(player);
 
-        private static bool IsBiomeGlobalKeyEnabled(Player player) => globalKeyPermitted.Value && biomeGlobalKeys.TryGetValue(player.m_currentBiome.ToString(), out string globalKey) && ZoneSystem.instance?.GetGlobalKey(globalKey) == true;
+        private static bool IsBiomeGlobalKeyEnabled(Player player) => IsBiomeGlobalKeyEnabled(player.m_currentBiome);
+
+        private static bool IsBiomeGlobalKeyEnabled(Heightmap.Biome biome) => globalKeyPermitted.Value && biomeGlobalKeys.TryGetValue(biome.ToString(), out string globalKey) && ZoneSystem.instance?.GetGlobalKey(globalKey) == true;
         
         private static bool IsBiomePlayerKeyEnabled(Player player) => playerKeyPermitted.Value && biomePlayerKeys.TryGetValue(player.m_currentBiome.ToString(), out string playerKey) && player.HaveUniqueKey(playerKey);
 
         private static bool IsBiomePlayerItemEnabled(Player player) => playerItemPermitted.Value && biomePlayerItems.TryGetValue(player.m_currentBiome.ToString(), out string playerItem) && player.IsKnownMaterial(playerItem);
 
         private static bool IsGated(Humanoid human) => human is Player player && player.GetSEMan()?.HaveStatusEffect(SE_BiomeGate.statusEffectBiomeGateHash) == true && Ship.GetLocalShip() == null;
+
+        [HarmonyPatch(typeof(Character), nameof(Character.ApplyDamage))]
+        public static class Character_ApplyDamage_CreatureDamageMultiplier
+        {
+            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                List<CodeInstruction> codes = instructions.ToList();
+                MethodInfo getTotalDamage = AccessTools.Method(typeof(HitData), nameof(HitData.GetTotalDamage), Type.EmptyTypes);
+                int firstDamageCall = getTotalDamage == null ? -1 : codes.FindIndex(instruction => instruction.Calls(getTotalDamage));
+                int storeIndex = firstDamageCall + 1;
+                while (storeIndex < codes.Count && codes[storeIndex].opcode == OpCodes.Nop)
+                    storeIndex++;
+
+                if (firstDamageCall < 0 || codes.Count(instruction => instruction.Calls(getTotalDamage)) != 2 ||
+                    storeIndex + 1 >= codes.Count || !codes[storeIndex].IsStloc() ||
+                    codes[storeIndex].blocks.Count != 0 || codes[storeIndex + 1].blocks.Count != 0)
+                {
+                    instance.Logger.LogError("Could not locate the expected damage calculations in Character.ApplyDamage. The creature damage multiplier was not applied.");
+                    return codes;
+                }
+
+                // Keep the first total for damage text, then scale the hit before the second total and stagger.
+                int insertIndex = storeIndex + 1;
+                CodeInstruction loadCharacter = new CodeInstruction(OpCodes.Ldarg_0).MoveLabelsFrom(codes[insertIndex]);
+                codes.InsertRange(insertIndex, new[]
+                {
+                    loadCharacter,
+                    new CodeInstruction(OpCodes.Ldarg_1),
+                    new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Character_ApplyDamage_CreatureDamageMultiplier), nameof(ApplyCreatureDamageMultiplier)))
+                });
+
+                return codes;
+            }
+
+            private static void ApplyCreatureDamageMultiplier(Character character, HitData hit)
+            {
+                float multiplier = creatureDamageReceivedMultiplier.Value;
+                if (multiplier == 1f || !modEnabled.Value)
+                    return;
+
+                if (multiplier < 0f || float.IsNaN(multiplier) || float.IsInfinity(multiplier))
+                    return;
+
+                if (character.IsPlayer() || !character.IsOwner() || gatedBiomes.Value == Heightmap.Biome.None)
+                    return;
+
+                WorldGenerator worldGenerator = WorldGenerator.instance;
+                if (worldGenerator == null)
+                    return;
+
+                Heightmap.Biome biome = worldGenerator.GetBiomeSector(character.transform.position).BiomeType.Biome;
+                if (biome == Heightmap.Biome.None || !gatedBiomes.Value.HasFlag(biome) || IsBiomeGlobalKeyEnabled(biome))
+                    return;
+
+                hit.m_damage.Modify(multiplier);
+            }
+        }
 
         [HarmonyPatch]
         public static class PreventInteractions
